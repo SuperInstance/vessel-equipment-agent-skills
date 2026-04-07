@@ -1,129 +1,39 @@
-# Vessel, Equipment, Agent, Skills
-Cocapn Fleet Reference Architecture
+# Vessel-Equipment-Agent-Skills: A Four-Layer Agent Architecture
 
-A practical pattern for structuring agent systems, built and validated across the Cocapn Fleet. This model enforces a clean separation between infrastructure, data, models, and prompt logic to improve maintainability and debugging.
+You stop debugging tangled agent logic at 2 a.m. This pattern fixes that.
 
-This is the four-layer model used across agents in the Cocapn Fleet. It is a production pattern for open-source agents running on platforms like Cloudflare Workers. Each layer has a distinct responsibility to prevent common architectural mistakes.
+A reference implementation used in production across the Cocapn Fleet. It runs on Cloudflare Workers and has zero dependencies.
 
----
-
-## Why this pattern exists
-
-Many agent implementations conflate infrastructure, data pipelines, model choices, and prompting strategies. This leads to fragile systems where changing a model requires rewriting data logic, or scaling infrastructure breaks prompt templates. This model assigns a single, clear responsibility to each layer.
-
----
-
-## The Four-Layer Model
-
-A functional agent system is composed of four distinct layers. Their separation is the primary guard against complexity.
-
-```
-┌─────────────────────────────────────────────────────┐
-│  VESSEL — The runtime environment                   │
-│  "A Cloudflare Worker with a 10ms CPU limit"        │
-│  "A Docker container on a Jetson Orin"              │
-│  "An AWS Lambda function in us-east-1"              │
-│  Defines compute, memory, network, and time limits. │
-│  Exists independently of the agent it hosts.        │
-├─────────────────────────────────────────────────────┤
-│  EQUIPMENT — Data and tools outside the model       │
-│  RAG pipelines, vector databases, file parsers      │
-│  Structured folders of JSON, markdown, or SQLite    │
-│  Filters and prepares input before the model sees it│
-│  Determines WHAT information the agent can access.  │
-├─────────────────────────────────────────────────────┤
-│  AGENT — The model and its context architecture     │
-│  "Claude-3.5-Sonnet with a 200K context window"     │
-│  "Qwen2.5-32B with sliding window attention"        │
-│  The model is the agent's core; the context         │
-│  architecture defines how it remembers and reasons. │
-├─────────────────────────────────────────────────────┤
-│  SKILLS — Modifiers on the context architecture     │
-│  Prompt templates, chain-of-thought, routing logic  │
-│  System prompts and few-shot examples               │
-│  Determines HOW the agent structures its reasoning. │
-└─────────────────────────────────────────────────────┘
-```
-
----
-
-## 1. Vessel — The Runtime
-
-A vessel is the objective runtime environment. Its constraints are real and must be accounted for.
-
-| Property          | Example Constraint                          |
-|-------------------|---------------------------------------------|
-| **Compute Time**  | Cloudflare Worker (10ms CPU free / 30s paid)|
-| **Memory**        | AWS Lambda (128MB - 10GB)                   |
-| **Network**       | Edge location (latency, regional egress)    |
-| **Persistence**   | Ephemeral or disk-based (KV, R2, /tmp)      |
-
-**Principle:** Choose a vessel that fits your agent's resource profile. Do not force a large, stateful agent into a serverless function.
-
----
-
-## 2. Equipment — Data and Tools
-
-Equipment is everything that processes information before it reaches the agent.
-
-*   **Data Loaders:** Parse PDFs, HTML, or APIs into clean text.
-*   **Retrieval Systems:** Vector stores, keyword search, or graph databases.
-*   **State Managers:** CRDTs for sync or simple KV for session state.
-*   **Pre-processors:** Filtering, summarization, or validation logic.
-
-**Principle:** Equipment should be model-agnostic. Swapping from GPT-4 to Claude should not require rewriting your RAG pipeline.
-
----
-
-## 3. Agent — The Model and Context
-
-The agent is the language model combined with its specific context management strategy.
-
-*   **Model:** The actual LLM (e.g., `deepseek-coder`, `llama-3.1-70b`).
-*   **Context Architecture:** How history is maintained (e.g., sliding window, summary-based, fixed buffer).
-*   **Identity:** The agent's name and core purpose, expressed in its base system prompt.
-
-**Principle:** The agent's identity and context strategy are coupled to the model's capabilities. A 7B model has a different context strategy than a 200K context model.
-
----
-
-## 4. Skills — Reasoning Modifiers
-
-Skills are reusable templates and techniques that shape the agent's reasoning for specific tasks.
-
-*   **Prompt Templates:** Structured instructions for tasks like "analyze this log" or "write a summary."
-*   **Reasoning Frameworks:** Chain-of-thought, reflection, or debate patterns.
-*   **Routing Rules:** Logic to select which sub-task or tool to use next.
-
-**Principle:** Skills are portable. A "code review" skill should work across different codebase-equipped agents.
-
----
+**Live URL:** [https://the-fleet.casey-digennaro.workers.dev](https://the-fleet.casey-digennaro.workers.dev)
 
 ## Quick Start
 
-This repository is a reference architecture, not a framework. To apply it:
+1.  Fork this repository.
+2.  Deploy directly to Cloudflare Workers.
+3.  Edit only the layer you need to change. You never modify the runtime to adjust a prompt.
 
-1.  **Define your Vessel:** Start with a simple Cloudflare Worker or a FastAPI server.
-2.  **Add Equipment:** Connect a vector database or load a directory of documentation.
-3.  **Choose an Agent:** Select a model (e.g., via OpenAI-compatible API) and a basic context window.
-4.  **Implement a Skill:** Write a single prompt template for a clear task, like "answer questions based on the provided context."
+## Why This Exists
 
-A basic implementation might be 150 lines of code: a server (Vessel), a function to load documents (Equipment), an API call to an LLM (Agent), and a formatted prompt (Skill).
+Our agent code repeatedly became unmanageable. A single prompt change could break deployment. A model update could break the data pipeline. This architecture enforces separation between components that should not interact, so you will not find infrastructure code mixed with business logic.
 
----
+## The Four Layers
+
+Each layer has a single responsibility. There are no cross-layer dependencies.
+
+1.  **Vessel:** The runtime environment. It manages compute, memory, and deployment. This layer is unaware of the agent it runs.
+2.  **Equipment:** Data and tools. This includes RAG pipelines, data parsers, and external API clients. It defines *what* the agent can access.
+3.  **Agent:** The reasoning engine. It handles model selection, context window management, and core interaction logic. It has no knowledge of your specific use case.
+4.  **Skills:** Behavior and prompt logic. It contains prompt templates, reasoning patterns, and output formatting rules. It defines *how* the agent thinks for a given task.
+
+## What It Solves
+
+*   **Independent Upgrades:** Swap your LLM provider or data pipeline without redeploying the entire application.
+*   **Localized Debugging:** Issues are confined to a single layer. You spend less time tracing errors through the stack.
+*   **Full Ownership:** This is not a framework. You fork and own every line of code. There is no library version lock-in.
+*   **Portability:** The agent logic is decoupled from the Cloudflare Workers runtime, making it easier to move to another platform later.
 
 ## Limitations
 
-This pattern adds upfront structural discipline, which can feel like overhead for very small, throwaway prototypes. Its value becomes clear when maintaining or scaling a system beyond a single script.
+The stateless nature of Cloudflare Workers means there is no built-in persistence between requests. If your agent requires long-term memory or session state, you must implement it externally using a database or KV store.
 
----
-
-## Attribution
-
-This architectural model was developed and documented by **Superinstance & Lucineer (DiGennaro et al.)** as part of the Cocapn Fleet.
-
----
-
-<div align="center">
-  <sub>Part of the <a href="https://the-fleet.casey-digennaro.workers.dev">Cocapn Fleet</a> • <a href="https://cocapn.ai">Cocapn.ai</a></sub>
-</div>
+<div style="text-align:center;padding:16px;color:#64748b;font-size:.8rem"><a href="https://the-fleet.casey-digennaro.workers.dev" style="color:#64748b">The Fleet</a> · <a href="https://cocapn.ai" style="color:#64748b">Cocapn</a></div>

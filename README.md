@@ -36,4 +36,13 @@ Each layer has a single responsibility. There are no cross-layer dependencies.
 
 The stateless nature of Cloudflare Workers means there is no built-in persistence between requests. If your agent requires long-term memory or session state, you must implement it externally using a database or KV store.
 
+## Fleet Context
+Part of the Cocapn fleet. Related repos:
+- [open-agents](https://github.com/SuperInstance/open-agents) — The fleet's core agent runtime
+- [plato-sdk](https://github.com/SuperInstance/plato-sdk) — Python SDK for building PLATO agents
+- [plato-server](https://github.com/SuperInstance/plato-server) — Knowledge server for agent learning
+
+---
+🦐 Cocapn fleet — lighthouse keeper architecture
+
 <div style="text-align:center;padding:16px;color:#64748b;font-size:.8rem"><a href="https://the-fleet.casey-digennaro.workers.dev" style="color:#64748b">The Fleet</a> · <a href="https://cocapn.ai" style="color:#64748b">Cocapn</a></div>
